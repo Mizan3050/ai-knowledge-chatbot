@@ -16,42 +16,64 @@ router = APIRouter()
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+FILE_UPLOAD_SCHEMA = {
+    "requestBody": {
+        "content": {
+            "multipart/form-data": {
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "files": {
+                            "type": "array",
+                            "items": {"type": "string", "format": "binary"}
+                        }
+                    },
+                    "required": ["files"]
+                }
+            }
+        }
+    }
+}
 
-@router.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
+@router.post("/upload", openapi_extra=FILE_UPLOAD_SCHEMA)
+async def upload_files(files: list[UploadFile] = File()):
     global vector_store
 
-    file_path = os.path.join(UPLOAD_DIR, file.filename)
+    total_chunks = 0
+    processed_files = []
 
-    # Save file
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    for file in files:
+        file_path = os.path.join(UPLOAD_DIR, file.filename)
 
-    # Extract page-wise text
-    pages = extract_text_by_page(file_path)
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
 
-    # Chunk with page info
-    chunks = chunk_pages(pages)
+        pages = extract_text_by_page(file_path)
+        chunks = chunk_pages(pages)
+        texts = [chunk["text"] for chunk in chunks]
+        embeddings = get_embeddings(texts)
 
-    # Extract only text for embeddings
-    texts = [chunk["text"] for chunk in chunks]
+        if vector_store is None:
+            dimension = len(embeddings[0])
+            vector_store = FAISSStore(dimension)
 
-    # Generate embeddings
-    embeddings = get_embeddings(texts)
+        vector_store.add(embeddings, chunks, file.filename)
 
-    # Initialize FAISS
-    dimension = len(embeddings[0])
-    vector_store = FAISSStore(dimension)
-
-    # Store with metadata
-    vector_store.add(embeddings, chunks, file.filename)
+        total_chunks += len(chunks)
+        processed_files.append({
+            "filename": file.filename,
+            "chunks": len(chunks)
+        })
 
     return {
-        "message": "Document processed with metadata",
-        "total_chunks": len(chunks)
+        "message": "Documents processed with metadata",
+        "total_files": len(processed_files),
+        "total_chunks": total_chunks,
+        "files": processed_files
     }
+
 @router.post("/chat")
-async def chat(query: str):
+async def chat(query: str, document: str = None):
     global vector_store
 
     if vector_store is None:
@@ -61,10 +83,32 @@ async def chat(query: str):
     query_embedding = get_embeddings([query])[0]
 
     # Step 2: retrieve chunks (with metadata)
-    results = vector_store.search(query_embedding, k=5)
+    results = vector_store.search(
+    query_embedding,
+    k=5,
+    document=document,
+    threshold=15
+)
+    filtered_results = []
+
+    for item in results:
+        overlap = keyword_overlap(query, item["text"])
+
+        if overlap >= 1:
+            filtered_results.append(item)
 
     # Extract only text for LLM
-    context_chunks = [item["text"] for item in results]
+    context_chunks = [
+    item["text"]
+    for item in results
+    if item.get("text")
+]
+
+    if not filtered_results:
+        return {
+            "answer": "No relevant information found.",
+            "sources": []
+        }
 
     # Step 3: generate answer
     answer = generate_answer(query, context_chunks)
@@ -73,3 +117,11 @@ async def chat(query: str):
         "answer": answer,
         "sources": results
     }
+
+def keyword_overlap(query, text):
+    query_words = set(query.lower().split())
+    text_words = set(text.lower().split())
+
+    overlap = query_words.intersection(text_words)
+
+    return len(overlap)
