@@ -3,8 +3,10 @@ import numpy as np
 import json
 import os
 
+from config import VECTOR_STORE_DIR
+
 class FAISSStore:
-    def __init__(self, dimension: int, index_path="vector_store/storage/index.faiss", metadata_path="vector_store/storage/metadata.json"):
+    def __init__(self, dimension: int, index_path=f"{VECTOR_STORE_DIR}"+"/index.faiss", metadata_path="vector_store/storage/metadata.json"):
         self.index_path = index_path
         self.metadata_path = metadata_path
 

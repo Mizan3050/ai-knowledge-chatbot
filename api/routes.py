@@ -1,6 +1,7 @@
 from fastapi import APIRouter, UploadFile, File
 import shutil
 import os
+from config import UPLOAD_DIR
 from services.embedding_service import get_embeddings
 from vector_store.faiss_store import FAISSStore
 from services.embedding_service import get_embeddings
@@ -13,7 +14,6 @@ vector_store = None
 
 router = APIRouter()
 
-UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 FILE_UPLOAD_SCHEMA = {
@@ -100,7 +100,7 @@ async def chat(query: str, document: str = None):
     # Extract only text for LLM
     context_chunks = [
     item["text"]
-    for item in results
+    for item in filtered_results
     if item.get("text")
 ]
 

@@ -13,7 +13,7 @@ def generate_answer(query: str, context_chunks: list[str]) -> str:
     You are a helpful assistant.
 
     Use the context below to answer the question clearly.
-    If the answer is partially available, try to summarize it.
+    If the answer is partially available, try to summarize it. If answer not in context, say you don't know.
 
     Context:
     {context}
