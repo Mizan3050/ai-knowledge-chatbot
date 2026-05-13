@@ -118,6 +118,23 @@ async def chat(query: str, document: str = None):
         "sources": results
     }
 
+@router.get("/documents")
+async def list_documents():
+    files = []
+
+    for filename in os.listdir(UPLOAD_DIR):
+        path = os.path.join(UPLOAD_DIR, filename)
+
+        if os.path.isfile(path):
+            files.append({
+                "name": filename,
+                "size": os.path.getsize(path)
+            })
+
+    return {
+        "documents": files
+    }
+
 def keyword_overlap(query, text):
     query_words = set(query.lower().split())
     text_words = set(text.lower().split())
