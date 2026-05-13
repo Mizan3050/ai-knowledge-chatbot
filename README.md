@@ -12,3 +12,5 @@ Questions.
 What are embeddings in FAISSStore
 What are embedding dimensions
 what is vectors, and what does it mean by converting text -> vector.
+
+Deployment done on railway
