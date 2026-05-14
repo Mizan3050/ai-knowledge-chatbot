@@ -8,6 +8,9 @@ from services.embedding_service import get_embeddings
 from services.llm_service import generate_answer
 from utils.file_loader import extract_text_by_page
 from utils.chunking import chunk_pages
+from datetime import datetime
+from fastapi.responses import FileResponse
+from fastapi import HTTPException
 
 # Initialize store (temporary, in-memory)
 vector_store = None
@@ -120,20 +123,42 @@ async def chat(query: str, document: str = None):
 
 @router.get("/documents")
 async def list_documents():
-    files = []
+    documents = []
 
     for filename in os.listdir(UPLOAD_DIR):
         path = os.path.join(UPLOAD_DIR, filename)
 
         if os.path.isfile(path):
-            files.append({
+            stat = os.stat(path)
+
+            documents.append({
                 "name": filename,
-                "size": os.path.getsize(path)
+                "size": stat.st_size,
+                "uploaded_at": datetime.fromtimestamp(
+                    stat.st_ctime
+                ),
+                "extension": filename.split(".")[-1]
             })
 
     return {
-        "documents": files
+        "documents": documents
     }
+
+@router.get("/documents/{filename}")
+async def get_document(filename: str):
+    file_path = os.path.join(UPLOAD_DIR, filename)
+
+    if not os.path.exists(file_path):
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found"
+        )
+
+    return FileResponse(
+        path=file_path,
+        filename=filename,
+        media_type="application/pdf"
+    )
 
 def keyword_overlap(query, text):
     query_words = set(query.lower().split())
