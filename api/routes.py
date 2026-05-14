@@ -117,8 +117,7 @@ async def chat(query: str, document: str = None):
     answer = generate_answer(query, context_chunks)
 
     return {
-        "answer": answer,
-        "sources": results
+        "answer": answer
     }
 
 @router.get("/documents")
