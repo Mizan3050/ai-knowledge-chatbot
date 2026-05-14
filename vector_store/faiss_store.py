@@ -6,10 +6,17 @@ import os
 from config import VECTOR_STORE_DIR
 
 class FAISSStore:
-    def __init__(self, dimension: int, index_path=f"{VECTOR_STORE_DIR}"+"/index.faiss", metadata_path="vector_store/storage/metadata.json"):
+    def __init__(
+    self,
+    dimension: int,
+    index_path=f"{VECTOR_STORE_DIR}/index.faiss",
+    metadata_path=f"{VECTOR_STORE_DIR}/metadata.json"
+):
         self.index_path = index_path
         self.metadata_path = metadata_path
-
+        self.dimension = dimension
+        self.index = faiss.IndexFlatL2(dimension)
+        self.data = []
         os.makedirs(os.path.dirname(index_path), exist_ok=True)
 
         if os.path.exists(index_path) and os.path.exists(metadata_path):
@@ -23,16 +30,30 @@ class FAISSStore:
             self.index = faiss.IndexFlatL2(dimension)
             self.data = []
 
+    def rebuild_index(self):
+        self.index = faiss.IndexFlatL2(self.dimension)
+        embeddings = []
+        for item in self.data:
+            embeddings.append(item["embedding"])
+        if embeddings:
+            vectors = np.array(
+                embeddings,
+                dtype="float32"
+            )
+            self.index.add(vectors)
+        self.save()
+
     def add(self, embeddings, chunks, file_name):
         vectors = np.array(embeddings).astype("float32")
         self.index.add(vectors)
 
-        for chunk in chunks:
+        for embedding, chunk in zip(embeddings, chunks):
             self.data.append({
                 "chunk_id": f"{file_name}_chunk_{len(self.data)}",
                 "document": file_name,
                 "text": chunk["text"],
-                "page": chunk["page"]
+                "page": chunk["page"],
+                "embedding": embedding
             })
 
         self.save()

@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse
 from fastapi import HTTPException
 
 # Initialize store (temporary, in-memory)
-vector_store = None
+vector_store = FAISSStore(dimension=1536)
 
 router = APIRouter()
 
@@ -159,6 +159,33 @@ async def get_document(filename: str):
         filename=filename,
         media_type="application/pdf"
     )
+
+@router.delete("/documents/{filename}")
+async def delete_document(filename: str):
+    file_path = os.path.join(UPLOAD_DIR, filename)
+
+    if not os.path.exists(file_path):
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found"
+        )
+
+    # Delete physical file
+    os.remove(file_path)
+
+    # Remove metadata entries
+    vector_store.data = [
+        item
+        for item in vector_store.data
+        if item["document"] != filename
+    ]
+
+    # Rebuild FAISS index
+    vector_store.rebuild_index()
+
+    return {
+        "message": f"{filename} deleted successfully"
+    }
 
 def keyword_overlap(query, text):
     query_words = set(query.lower().split())

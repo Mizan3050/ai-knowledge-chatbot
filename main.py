@@ -5,9 +5,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
-# Load FAISS store on startup
-vector_store = FAISSStore(dimension=1536)  # embedding size for OpenAI model
-
 app.include_router(router)
 
 app.add_middleware(
